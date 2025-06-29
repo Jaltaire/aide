@@ -309,6 +309,28 @@ impl OperationOutput for () {
     }
 }
 
+impl OperationOutput for Infallible {
+    type Inner = Self;
+
+    fn operation_response(
+        _ctx: &mut crate::generate::GenContext,
+        _operation: &mut Operation,
+    ) -> Option<crate::openapi::Response> {
+        Some(no_content_response())
+    }
+
+    fn inferred_responses(
+        ctx: &mut crate::generate::GenContext,
+        operation: &mut Operation,
+    ) -> Vec<(Option<u16>, Response)> {
+        if let Some(res) = Self::operation_response(ctx, operation) {
+            Vec::from([(Some(ctx.no_content_status), res)])
+        } else {
+            Vec::new()
+        }
+    }
+}
+
 impl OperationInput for Vec<u8> {
     fn operation_input(
         ctx: &mut crate::generate::GenContext,
