@@ -1,5 +1,5 @@
 use std::{borrow::Cow, convert::Infallible, rc::Rc, sync::Arc};
-
+use std::ops::ControlFlow;
 use crate::{
     openapi::{MediaType, Operation, RequestBody, Response},
     operation::set_body,
@@ -55,6 +55,30 @@ where
     ) -> Vec<(Option<u16>, Response)> {
         let mut responses = T::inferred_responses(ctx, operation);
         responses.extend(E::inferred_responses(ctx, operation));
+        responses
+    }
+}
+
+impl<B, C> OperationOutput for ControlFlow<B, C>
+where
+    B: OperationOutput,
+    C: OperationOutput,
+{
+    type Inner = B;
+
+    fn operation_response(
+        ctx: &mut crate::generate::GenContext,
+        operation: &mut Operation,
+    ) -> Option<Response> {
+        B::operation_response(ctx, operation)
+    }
+
+    fn inferred_responses(
+        ctx: &mut crate::generate::GenContext,
+        operation: &mut Operation,
+    ) -> Vec<(Option<u16>, Response)> {
+        let mut responses = B::inferred_responses(ctx, operation);
+        responses.extend(B::inferred_responses(ctx, operation));
         responses
     }
 }
