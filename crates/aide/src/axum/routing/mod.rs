@@ -8,7 +8,6 @@ use std::{convert::Infallible, mem};
 use crate::{
     generate::GenContext,
     openapi::{Operation, PathItem, ReferenceOr, Response, StatusCode},
-    Error,
 };
 use axum::routing::{MethodFilter, Route};
 use axum::{body::Body, response::IntoResponse};
@@ -25,6 +24,7 @@ use crate::{
     generate::in_context,
     operation::{OperationHandler, OperationInput, OperationOutput},
     transform::TransformOperation,
+    util::merge_response,
 };
 
 /// A wrapper over [`axum::routing::MethodRouter`] that adds
@@ -245,22 +245,27 @@ fn set_inferred_response(
     let responses = operation.responses.as_mut().unwrap();
 
     match status {
-        Some(status) => {
-            if responses.responses.contains_key(&StatusCode::Code(status)) {
-                ctx.error(Error::InferredResponseConflict(status));
-            } else {
+        Some(status) => match responses.responses.get_mut(&StatusCode::Code(status)) {
+            Some(existing) => {
+                if let ReferenceOr::Item(existing) = existing {
+                    merge_response(existing, res);
+                }
+            }
+            None => {
                 responses
                     .responses
                     .insert(StatusCode::Code(status), ReferenceOr::Item(res));
             }
-        }
-        None => {
-            if responses.default.is_some() {
-                ctx.error(Error::InferredDefaultResponseConflict);
-            } else {
+        },
+        None => match responses.default.as_mut() {
+            Some(ReferenceOr::Item(existing)) => {
+                merge_response(existing, res);
+            }
+            Some(ReferenceOr::Reference { .. }) => {}
+            None => {
                 responses.default = Some(ReferenceOr::Item(res));
             }
-        }
+        },
     }
 }
 

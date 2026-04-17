@@ -3,7 +3,7 @@
 
 use crate::{
     generate::GenContext,
-    openapi::{Operation, PathItem, Response},
+    openapi::{MediaType, Operation, PathItem, Response},
     Error,
 };
 
@@ -140,6 +140,65 @@ pub(crate) fn no_content_response() -> Response {
         description: "no content".to_string(),
         ..Default::default()
     }
+}
+
+pub(crate) fn merge_response(target: &mut Response, incoming: Response) {
+    merge_string_field(&mut target.description, incoming.description);
+
+    for (name, header) in incoming.headers {
+        target.headers.entry(name).or_insert(header);
+    }
+
+    for (media_type, incoming_media_type) in incoming.content {
+        match target.content.get_mut(&media_type) {
+            Some(existing_media_type) => {
+                merge_media_type(existing_media_type, incoming_media_type);
+            }
+            None => {
+                target.content.insert(media_type, incoming_media_type);
+            }
+        }
+    }
+
+    for (name, link) in incoming.links {
+        target.links.entry(name).or_insert(link);
+    }
+
+    target.extensions.extend(incoming.extensions);
+}
+
+fn merge_media_type(target: &mut MediaType, incoming: MediaType) {
+    if target.schema.is_none() {
+        target.schema = incoming.schema;
+    }
+
+    if target.example.is_none() {
+        target.example = incoming.example;
+    }
+
+    for (name, example) in incoming.examples {
+        target.examples.entry(name).or_insert(example);
+    }
+
+    for (name, encoding) in incoming.encoding {
+        target.encoding.entry(name).or_insert(encoding);
+    }
+
+    target.extensions.extend(incoming.extensions);
+}
+
+fn merge_string_field(target: &mut String, incoming: String) {
+    if incoming.is_empty() || target.contains(&incoming) {
+        return;
+    }
+
+    if target.is_empty() {
+        *target = incoming;
+        return;
+    }
+
+    target.push('\n');
+    target.push_str(&incoming);
 }
 
 // FIXME: remove the code below when the upstream openapiv3 3.1 is available.
